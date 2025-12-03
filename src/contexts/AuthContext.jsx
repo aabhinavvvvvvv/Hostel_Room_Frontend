@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Get API URL for logging/debugging
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
@@ -44,18 +45,24 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        withCredentials: true,
-        timeout: 10000, // 10 second timeout
-      });
+      const response = await api.get('/auth/me');
       if (response.data.success) {
         setUser(response.data.user);
+      } else {
+        // If response is not successful, clear user
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error.message);
       console.error('API URL:', API_URL);
-      // If it's a network error or CORS issue, still set loading to false
-      setUser(null);
+      console.error('Error details:', error.response?.status, error.response?.data);
+      
+      // Only clear user if it's a 401 (unauthorized), not for network errors
+      // This prevents clearing user state immediately after login due to network issues
+      if (error.response?.status === 401) {
+        setUser(null);
+      }
+      // For other errors (network, timeout, etc.), keep current user state if it exists
     } finally {
       // Always set loading to false, even if there's an error
       setLoading(false);
@@ -64,13 +71,25 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post(
-        `${API_URL}/auth/login`,
-        { email, password },
-        { withCredentials: true }
-      );
+      const response = await api.post('/auth/login', { email, password });
       if (response.data.success) {
+        // Set user immediately after successful login
         setUser(response.data.user);
+        
+        // Verify the login by checking auth status
+        // Wait a bit for cookie to be set
+        setTimeout(async () => {
+          try {
+            const verifyResponse = await api.get('/auth/me');
+            if (verifyResponse.data.success) {
+              setUser(verifyResponse.data.user);
+            }
+          } catch (verifyError) {
+            console.warn('Auth verification after login failed:', verifyError.message);
+            // Don't clear user - cookie might still be setting
+          }
+        }, 500);
+        
         toast.success('Login successful');
         return { success: true };
       }
@@ -83,11 +102,12 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password, universityId) => {
     try {
-      const response = await axios.post(
-        `${API_URL}/auth/register`,
-        { name, email, password, universityId },
-        { withCredentials: true }
-      );
+      const response = await api.post('/auth/register', {
+        name,
+        email,
+        password,
+        universityId,
+      });
       if (response.data.success) {
         setUser(response.data.user);
         toast.success('Registration successful');
@@ -102,7 +122,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+      await api.post('/auth/logout', {});
       setUser(null);
       toast.success('Logged out successfully');
     } catch (error) {

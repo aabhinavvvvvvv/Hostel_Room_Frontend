@@ -26,8 +26,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
-      window.location.href = '/login';
+      // Only redirect if we're not already on the login page
+      // This prevents redirect loops and allows AuthContext to handle the state
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        // Don't redirect immediately - let AuthContext handle it
+        // This prevents instant logout after login
+        console.warn('Unauthorized request, but not redirecting to avoid logout loop');
+      }
     } else if (error.code === 'ECONNABORTED' || error.message === 'Network Error') {
       console.error('API connection error:', error.message);
       console.error('API URL:', API_URL);
