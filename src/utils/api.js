@@ -14,6 +14,16 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Log request details in development
+    if (import.meta.env.DEV) {
+      console.log('API Request:', {
+        method: config.method,
+        url: config.url,
+        baseURL: config.baseURL,
+        withCredentials: config.withCredentials,
+        hasCookies: document.cookie.length > 0,
+      });
+    }
     return config;
   },
   (error) => {
