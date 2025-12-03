@@ -70,7 +70,33 @@ const ApplyForm = () => {
         navigate('/student');
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to submit application';
+      console.error('Application submission error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Get detailed error message
+      let message = 'Failed to submit application';
+      
+      if (error.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error.response?.data?.errors) {
+        // Handle validation errors
+        const validationErrors = error.response.data.errors;
+        if (Array.isArray(validationErrors)) {
+          message = validationErrors.map(e => e.msg || e.message).join(', ');
+        } else {
+          message = JSON.stringify(validationErrors);
+        }
+      } else if (error.response?.status === 401) {
+        message = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        message = 'You do not have permission to submit an application.';
+      } else if (error.response?.status === 400) {
+        message = error.response.data.message || 'Invalid application data. Please check your inputs.';
+      } else if (error.message) {
+        message = error.message;
+      }
+      
       toast.error(message);
     } finally {
       setLoading(false);

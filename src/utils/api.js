@@ -14,16 +14,26 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Log request details in development
-    if (import.meta.env.DEV) {
-      console.log('API Request:', {
-        method: config.method,
-        url: config.url,
-        baseURL: config.baseURL,
-        withCredentials: config.withCredentials,
-        hasCookies: document.cookie.length > 0,
-      });
+    // Always log cookie status for debugging (especially in production)
+    const cookies = document.cookie;
+    const hasTokenCookie = cookies.includes('token=');
+    
+    console.log('API Request:', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+      withCredentials: config.withCredentials,
+      hasCookies: cookies.length > 0,
+      hasTokenCookie: hasTokenCookie,
+      cookieString: cookies.substring(0, 100), // First 100 chars for debugging
+    });
+    
+    // Warn if cookie is missing for authenticated endpoints
+    if (!hasTokenCookie && config.url && !config.url.includes('/auth/login') && !config.url.includes('/auth/register')) {
+      console.warn('⚠️ No token cookie found for request:', config.url);
+      console.warn('Available cookies:', cookies || 'None');
     }
+    
     return config;
   },
   (error) => {
