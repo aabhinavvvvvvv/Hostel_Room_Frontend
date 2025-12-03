@@ -8,16 +8,13 @@ import StudentDashboard from './pages/student/Dashboard';
 import WardenDashboard from './pages/warden/Dashboard';
 import AdminDashboard from './pages/admin/Dashboard';
 import RoleProtectedRoute from './components/shared/RoleProtectedRoute';
+import LoadingSpinner from './components/shared/LoadingSpinner';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
@@ -28,11 +25,15 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <RoleProtectedRoute allowedRoles={['STUDENT', 'WARDEN', 'ADMIN']}>
-            {user?.role === 'STUDENT' && <StudentDashboard />}
-            {user?.role === 'WARDEN' && <WardenDashboard />}
-            {user?.role === 'ADMIN' && <AdminDashboard />}
-          </RoleProtectedRoute>
+          user ? (
+            <RoleProtectedRoute allowedRoles={['STUDENT', 'WARDEN', 'ADMIN']}>
+              {user?.role === 'STUDENT' && <StudentDashboard />}
+              {user?.role === 'WARDEN' && <WardenDashboard />}
+              {user?.role === 'ADMIN' && <AdminDashboard />}
+            </RoleProtectedRoute>
+          ) : (
+            <Navigate to="/login" />
+          )
         }
       />
       

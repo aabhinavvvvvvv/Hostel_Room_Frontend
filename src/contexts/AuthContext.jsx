@@ -19,20 +19,45 @@ export const AuthProvider = ({ children }) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
-    checkAuth();
+    let isMounted = true;
+    
+    // Add a safety timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('Auth check timed out, setting loading to false');
+        setLoading(false);
+      }
+    }, 15000); // 15 second max wait
+
+    checkAuth().finally(() => {
+      if (isMounted) {
+        clearTimeout(timeoutId);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAuth = async () => {
     try {
       const response = await axios.get(`${API_URL}/auth/me`, {
         withCredentials: true,
+        timeout: 10000, // 10 second timeout
       });
       if (response.data.success) {
         setUser(response.data.user);
       }
     } catch (error) {
+      console.error('Auth check failed:', error.message);
+      console.error('API URL:', API_URL);
+      // If it's a network error or CORS issue, still set loading to false
       setUser(null);
     } finally {
+      // Always set loading to false, even if there's an error
       setLoading(false);
     }
   };
