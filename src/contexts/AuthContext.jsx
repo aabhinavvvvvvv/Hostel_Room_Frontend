@@ -52,12 +52,15 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    // If we already have a user, don't clear it on network errors
+    const hadUser = !!user;
+
     try {
       const response = await api.get('/auth/me');
       if (response.data.success) {
         setUser(response.data.user);
       } else {
-        // If response is not successful, clear user (unless we just logged in)
+        // If response is not successful, only clear user if we didn't just log in
         if (!justLoggedIn) {
           setUser(null);
         }
@@ -66,13 +69,20 @@ export const AuthProvider = ({ children }) => {
       console.error('Auth check failed:', error.message);
       console.error('API URL:', API_URL);
       console.error('Error details:', error.response?.status, error.response?.data);
+      console.error('Cookies during auth check:', document.cookie);
       
       // Only clear user if it's a 401 (unauthorized) AND we didn't just log in
-      // This prevents clearing user state immediately after login
-      if (error.response?.status === 401 && !justLoggedIn) {
+      // AND we didn't have a user before (to prevent clearing user on network errors)
+      if (error.response?.status === 401 && !justLoggedIn && !hadUser) {
+        console.log('Clearing user due to 401 error');
         setUser(null);
+      } else if (error.response?.status === 401 && justLoggedIn) {
+        console.log('Got 401 but just logged in - keeping user state');
+        // Keep user state - cookie might still be setting
+      } else {
+        console.log('Keeping user state despite error');
+        // For other errors (network, timeout, etc.), keep current user state if it exists
       }
-      // For other errors (network, timeout, etc.), keep current user state if it exists
     } finally {
       // Always set loading to false, even if there's an error
       setLoading(false);
@@ -89,25 +99,37 @@ export const AuthProvider = ({ children }) => {
         // Set user immediately after successful login
         setUser(response.data.user);
         
+        console.log('Login successful, user set:', response.data.user);
+        console.log('Cookies after login:', document.cookie);
+        
         toast.success('Login successful');
         
-        // Clear the flag after a delay to allow cookie to be set
+        // Clear the flag after a longer delay to allow cookie to be set and verified
         // This prevents checkAuth from clearing user state immediately
         setTimeout(() => {
-          setJustLoggedIn(false);
-          
           // Verify the login after cookie should be set
           api.get('/auth/me')
             .then((verifyResponse) => {
               if (verifyResponse.data.success) {
+                console.log('Auth verification successful');
                 setUser(verifyResponse.data.user);
+              } else {
+                console.warn('Auth verification returned unsuccessful response');
+                // Keep user state from login - don't clear it
               }
             })
             .catch((verifyError) => {
               console.warn('Auth verification after login failed:', verifyError.message);
+              console.warn('Error status:', verifyError.response?.status);
+              console.warn('Cookies during verification:', document.cookie);
               // Don't clear user - keep the user state from login response
+              // The cookie might still be setting or there might be a network issue
+            })
+            .finally(() => {
+              // Clear the flag after verification attempt
+              setJustLoggedIn(false);
             });
-        }, 1000); // Wait 1 second for cookie to be set
+        }, 2000); // Wait 2 seconds for cookie to be set
         
         return { success: true };
       }
